@@ -154,6 +154,15 @@ export default function FallingNotes({
         ctx.shadowBlur = 0;
         ctx.fillStyle = "rgba(255,255,255,0.25)";
         ctx.fillRect(x - noteW / 2 + 2, drawTop + 2, noteW * 0.4, noteH - 4);
+
+        // Finger number (only for right-hand notes with finger data, if note tall enough)
+        if (note.finger && noteH > 18 && note.hand === "right") {
+          ctx.fillStyle = "rgba(255,255,255,0.95)";
+          ctx.font = `bold ${Math.min(14, noteH - 4)}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(String(note.finger), x, drawTop + noteH / 2);
+        }
       });
 
       // Beat lines (subtle grid)

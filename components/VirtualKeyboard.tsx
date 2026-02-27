@@ -3,16 +3,15 @@
 import { noteToMidi } from "@/data/songs";
 
 type Props = {
-  activeNotes: string[]; // currently pressed notes (green = correct)
-  targetNotes: string[]; // notes to press (highlighted)
+  activeNotes: string[];
+  targetNotes: string[];
+  targetFingers?: Record<string, number>; // note name → finger number
   hand?: "right" | "left" | "both";
 };
 
-// Keys to show: from C3 to C6 (3 octaves)
 const START_MIDI = noteToMidi("C3");
 const END_MIDI = noteToMidi("C6");
-
-const BLACK_POSITIONS = [1, 3, 6, 8, 10]; // C#, D#, F#, G#, A# within octave
+const BLACK_POSITIONS = [1, 3, 6, 8, 10];
 
 function isBlack(midi: number): boolean {
   return BLACK_POSITIONS.includes(midi % 12);
@@ -40,23 +39,7 @@ function midiToNoteName(midi: number): string {
   return `${names[midi % 12]}${octave}`;
 }
 
-// Position of white key (index among white keys)
-function whiteKeyIndex(midi: number): number {
-  const whites = getWhiteKeys();
-  return whites.indexOf(midi);
-}
-
-// For black keys: position between white keys
-function blackKeyPosition(midi: number): number {
-  const whites = getWhiteKeys();
-  // Find the white key just below
-  let below = midi - 1;
-  while (isBlack(below)) below--;
-  const belowIdx = whites.indexOf(below);
-  return belowIdx + 0.6; // slightly right of the white key
-}
-
-export default function VirtualKeyboard({ activeNotes, targetNotes }: Props) {
+export default function VirtualKeyboard({ activeNotes, targetNotes, targetFingers = {} }: Props) {
   const whites = getWhiteKeys();
   const blacks = getBlackKeys();
   const totalWhites = whites.length;
@@ -64,17 +47,24 @@ export default function VirtualKeyboard({ activeNotes, targetNotes }: Props) {
   const targetMidis = new Set(targetNotes.map(noteToMidi));
   const activeMidis = new Set(activeNotes.map(noteToMidi));
 
+  // Build midi → finger map
+  const fingerByMidi: Record<number, number> = {};
+  Object.entries(targetFingers).forEach(([note, finger]) => {
+    fingerByMidi[noteToMidi(note)] = finger;
+  });
+
   return (
     <div className="relative w-full select-none" style={{ height: 120 }}>
       <div className="relative w-full h-full flex">
-        {whites.map((midi, i) => {
+        {whites.map((midi) => {
           const name = midiToNoteName(midi);
           const isTarget = targetMidis.has(midi);
           const isActive = activeMidis.has(midi);
           const isC = midi % 12 === 0;
+          const finger = fingerByMidi[midi];
 
           let bg = "bg-white";
-          let border = "border-gray-400";
+          const border = "border-gray-400";
           if (isActive) {
             bg = "bg-green-400";
           } else if (isTarget) {
@@ -88,12 +78,19 @@ export default function VirtualKeyboard({ activeNotes, targetNotes }: Props) {
               style={{ minWidth: 0 }}
             >
               {isC && (
-                <span className="text-gray-500 text-xs font-medium select-none">
-                  {name}
-                </span>
+                <span className="text-gray-500 text-xs font-medium select-none">{name}</span>
               )}
               {isTarget && !isActive && (
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-purple-500 opacity-80" />
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5">
+                  <div className="w-5 h-5 rounded-full bg-purple-500 opacity-90 flex items-center justify-center">
+                    {finger && (
+                      <span className="text-white text-xs font-bold leading-none">{finger}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              {isActive && (
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-green-600 opacity-80" />
               )}
             </div>
           );
@@ -103,13 +100,14 @@ export default function VirtualKeyboard({ activeNotes, targetNotes }: Props) {
       {/* Black keys overlay */}
       <div className="absolute inset-0 pointer-events-none">
         {blacks.map((midi) => {
-          const whites = getWhiteKeys();
+          const ws = getWhiteKeys();
           let below = midi - 1;
           while (isBlack(below)) below--;
-          const belowIdx = whites.indexOf(below);
+          const belowIdx = ws.indexOf(below);
 
           const isTarget = targetMidis.has(midi);
           const isActive = activeMidis.has(midi);
+          const finger = fingerByMidi[midi];
 
           let bg = "bg-gray-900";
           if (isActive) bg = "bg-green-500";
@@ -120,7 +118,7 @@ export default function VirtualKeyboard({ activeNotes, targetNotes }: Props) {
           return (
             <div
               key={midi}
-              className={`absolute top-0 ${bg} rounded-b z-10 flex items-end justify-center pb-1 transition-colors duration-75`}
+              className={`absolute top-0 ${bg} rounded-b z-10 flex items-center justify-center transition-colors duration-75`}
               style={{
                 left: `${leftPct}%`,
                 width: `${(0.6 / totalWhites) * 100}%`,
@@ -128,7 +126,11 @@ export default function VirtualKeyboard({ activeNotes, targetNotes }: Props) {
               }}
             >
               {isTarget && !isActive && (
-                <div className="w-3 h-3 rounded-full bg-purple-300 opacity-90" />
+                <div className="absolute top-1 flex items-center justify-center w-4 h-4 rounded-full bg-purple-300">
+                  {finger && (
+                    <span className="text-purple-900 text-xs font-bold leading-none">{finger}</span>
+                  )}
+                </div>
               )}
             </div>
           );

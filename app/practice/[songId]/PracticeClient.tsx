@@ -5,6 +5,7 @@ import { Song, NoteEvent } from "@/data/songs";
 import { notesMatch } from "@/lib/pitchDetection";
 import { saveProgress, useProgress, useSongStats, incrementPlayCount } from "@/lib/useProgress";
 import { initAudio, playNote, playCorrect, playWrong, playFinish } from "@/lib/piano";
+import { startPreview, stopPreview, onPreviewStateChange } from "@/lib/songPreview";
 import FallingNotes from "@/components/FallingNotes";
 import VirtualKeyboard from "@/components/VirtualKeyboard";
 import AudioEngine from "@/components/AudioEngine";
@@ -34,9 +35,17 @@ export default function PracticeClient({ song }: { song: Song }) {
   const [score, setScore] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [showIntro, setShowIntro] = useState(true);
+  const [isPreviewing, setIsPreviewing] = useState(false);
 
   const savedProgress = useProgress(song.id, mode);
   const songStats = useSongStats(song.id);
+
+  useEffect(() => {
+    const unsub = onPreviewStateChange((state, songId) => {
+      setIsPreviewing(state === "playing" && songId === song.id);
+    });
+    return () => { unsub(); stopPreview(); };
+  }, [song.id]);
 
   const rafRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
@@ -250,6 +259,38 @@ export default function PracticeClient({ song }: { song: Song }) {
             <p className="text-gray-300 leading-relaxed text-sm">{song.introText}</p>
           </div>
 
+          {/* Preview */}
+          <button
+            onClick={() => {
+              if (isPreviewing) {
+                stopPreview();
+              } else {
+                startPreview(song);
+              }
+            }}
+            className={`w-full py-3 rounded-2xl font-semibold text-sm mb-4 flex items-center justify-center gap-2 transition-all ${
+              isPreviewing
+                ? "bg-purple-600 text-white"
+                : "bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700"
+            }`}
+          >
+            {isPreviewing ? (
+              <>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                  <rect width="12" height="12" rx="2" />
+                </svg>
+                Stoppen
+              </>
+            ) : (
+              <>
+                <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor">
+                  <polygon points="0,0 12,7 0,14" />
+                </svg>
+                Song anhören
+              </>
+            )}
+          </button>
+
           {/* Mode */}
           <div className="bg-gray-900 rounded-2xl p-4 mb-4">
             <h2 className="text-base font-semibold mb-3 text-purple-400">Lernmodus</h2>
@@ -320,7 +361,7 @@ export default function PracticeClient({ song }: { song: Song }) {
           </div>
 
           <button
-            onClick={() => { setShowIntro(false); setTimeout(startGame, 100); }}
+            onClick={() => { stopPreview(); setShowIntro(false); setTimeout(startGame, 100); }}
             className="w-full py-4 bg-purple-600 hover:bg-purple-500 rounded-2xl text-lg font-bold transition-all active:scale-95"
           >
             Los geht&apos;s! 🎵

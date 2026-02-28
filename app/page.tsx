@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { SONGS } from "@/data/songs";
+import { SONGS, Song } from "@/data/songs";
 import { useAllProgress, useTotalStats, getSongPlayCounts } from "@/lib/useProgress";
+import { startPreview, stopPreview, isPreviewPlaying, onPreviewStateChange } from "@/lib/songPreview";
 import { useState, useEffect } from "react";
 
 const difficultyLabel: Record<string, string> = {
@@ -21,10 +22,28 @@ export default function HomePage() {
   const allProgress = useAllProgress();
   const totalStats = useTotalStats();
   const [playCounts, setPlayCounts] = useState<Record<string, number>>({});
+  const [previewingSongId, setPreviewingSongId] = useState<string | null>(null);
 
   useEffect(() => {
     setPlayCounts(getSongPlayCounts());
   }, []);
+
+  useEffect(() => {
+    const unsub = onPreviewStateChange((state, songId) => {
+      setPreviewingSongId(state === "playing" ? songId : null);
+    });
+    return () => { unsub(); stopPreview(); };
+  }, []);
+
+  function handlePreviewClick(e: React.MouseEvent, song: Song) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isPreviewPlaying(song.id)) {
+      stopPreview();
+    } else {
+      startPreview(song);
+    }
+  }
 
   function getBestScore(songId: string) {
     const right = allProgress[`${songId}__right`];
@@ -161,9 +180,25 @@ export default function HomePage() {
                     )}
                   </div>
                 </div>
-                <div className="text-purple-400 group-hover:translate-x-1 transition-transform flex-shrink-0">
-                  →
-                </div>
+                <button
+                  onClick={(e) => handlePreviewClick(e, song)}
+                  className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                    previewingSongId === song.id
+                      ? "bg-purple-500 text-white animate-pulse"
+                      : "bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white"
+                  }`}
+                  title={previewingSongId === song.id ? "Stoppen" : "Anhören"}
+                >
+                  {previewingSongId === song.id ? (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                      <rect width="12" height="12" rx="2" />
+                    </svg>
+                  ) : (
+                    <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor">
+                      <polygon points="0,0 12,7 0,14" />
+                    </svg>
+                  )}
+                </button>
               </Link>
             );
           })}
